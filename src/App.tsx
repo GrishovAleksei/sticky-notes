@@ -1,9 +1,10 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { Header } from "./components/Header/Header.tsx";
-import "./App.css";
 import { type INote, ModeType } from "./types.ts";
 import { Note } from "./components/Note/Note.tsx";
-import { noteSize } from "./vars.ts";
+import { hederHeight, noteSize } from "./vars.ts";
+import { TrashZone } from "./components/TrashZone/TrashZone.tsx";
+import "./App.css";
 
 const MODE_CLASS: Record<ModeType, string> = {
   [ModeType.IDLE]: "idle",
@@ -17,6 +18,7 @@ function App() {
   const [mode, setMode] = useState<ModeType>(ModeType.IDLE);
   const [maxZIndex, setMaxZIndex] = useState<number>(1);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+  const trashZoneRef = useRef<HTMLDivElement>(null);
 
   const activateAddingMode = useCallback(() => {
     setMode(ModeType.ADDING);
@@ -68,12 +70,45 @@ function App() {
     [maxZIndex],
   );
 
+  const handleDrag = useCallback(
+    (id: string, x: number, y: number) => {
+      updateNote({ id, x, y });
+
+      if (trashZoneRef.current) {
+        const trashRect = trashZoneRef.current.getBoundingClientRect();
+        const note = notes.find((n) => n.id === id);
+        if (!note) return;
+      }
+    },
+    [notes, updateNote],
+  );
+
   const onClickNote = useCallback(
     (e: React.MouseEvent, id: string) => {
       e.preventDefault();
       setActiveNote(id);
+      const element = e.currentTarget as HTMLElement;
+      const rect = element.getBoundingClientRect();
+      const offsetX = e.clientX - rect.left;
+      const offsetY = e.clientY - rect.top + hederHeight;
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        console.log("handleMouseMove");
+        const newX = moveEvent.clientX - offsetX;
+        const newY = moveEvent.clientY - offsetY;
+        handleDrag(id, newX, newY);
+      };
+
+      const handleMouseUp = () => {
+        setActiveNoteId(null);
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
+
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
     },
-    [setActiveNote],
+    [handleDrag, setActiveNote],
   );
 
   return (
@@ -91,6 +126,7 @@ function App() {
             onUpdate={updateNote}
           />
         ))}
+        <TrashZone isActive={false} />
       </div>
     </div>
   );
