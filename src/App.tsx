@@ -1,10 +1,12 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Header } from "./components/Header/Header.tsx";
 import { type INote, ModeType } from "./types.ts";
 import { Note } from "./components/Note/Note.tsx";
 import { hederHeight, noteSize } from "./vars.ts";
 import { TrashZone } from "./components/TrashZone/TrashZone.tsx";
 import "./App.css";
+import { loadNotes, saveNotes } from "./Services/LocalStorage.ts";
+import { mockApi } from "./Services/api.ts";
 
 const MODE_CLASS: Record<ModeType, string> = {
   [ModeType.IDLE]: "idle",
@@ -13,16 +15,59 @@ const MODE_CLASS: Record<ModeType, string> = {
   [ModeType.OVER_TRASH]: "over-trash",
 };
 
+// TODO: rm hederHeight from the dragging logic
 function App() {
   const [notes, setNotes] = useState<INote[]>([]);
   const [mode, setMode] = useState<ModeType>(ModeType.IDLE);
   const [maxZIndex, setMaxZIndex] = useState<number>(1);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+  // TODO: duplicating! overTrashId & deletingIdRef
+  const [overTrashId, setOverTrashId] = useState<string | null>(null);
+  const deletingIdRef = useRef<string | null>(null);
   const trashZoneRef = useRef<HTMLDivElement>(null);
+
+  // Load
+  useEffect(() => {
+    console.log("useEffect1");
+    const savedNotes = loadNotes();
+    if (savedNotes.length > 0) {
+      setNotes(savedNotes);
+      const maxZ = Math.max(...savedNotes.map((note) => note.z), 0);
+      setMaxZIndex(maxZ + 1);
+    }
+  }, []);
+
+  // Save
+  useEffect(() => {
+    console.log("useEffect2");
+    // TODO: spam
+
+    if (notes.length > 0) {
+      saveNotes(notes);
+      mockApi.saveNotes(notes).catch((err) => {
+        console.error("Failed to save to API:", err);
+      });
+    }
+  }, [notes]);
 
   const activateAddingMode = useCallback(() => {
     setMode(ModeType.ADDING);
   }, []);
+
+  const resetStates = useCallback(() => {
+    setActiveNoteId(null);
+    setOverTrashId(null);
+    deletingIdRef.current = null;
+    setMode(ModeType.IDLE);
+  }, []);
+
+  const deleteNote = useCallback(
+    (id: string) => {
+      const newNotes = notes.filter((note) => note.id !== id);
+      setNotes(newNotes);
+    },
+    [notes],
+  );
 
   const onClickCanvas = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -78,6 +123,25 @@ function App() {
         const trashRect = trashZoneRef.current.getBoundingClientRect();
         const note = notes.find((n) => n.id === id);
         if (!note) return;
+
+        const noteRect = {
+          left: x,
+          right: x + note.w,
+          top: y,
+          bottom: y + note.h + hederHeight,
+        };
+
+        const isOverlapping = !(
+          noteRect.right < trashRect.left ||
+          noteRect.left > trashRect.right ||
+          noteRect.bottom < trashRect.top ||
+          noteRect.top > trashRect.bottom
+        );
+
+        const _id = isOverlapping ? id : null;
+        console.log(`isOverlapping=${isOverlapping}`, id);
+        deletingIdRef.current = _id;
+        setOverTrashId(_id);
       }
     },
     [notes, updateNote],
@@ -93,14 +157,17 @@ function App() {
       const offsetY = e.clientY - rect.top + hederHeight;
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
-        console.log("handleMouseMove");
+        setMode(ModeType.DRAGGING);
         const newX = moveEvent.clientX - offsetX;
         const newY = moveEvent.clientY - offsetY;
         handleDrag(id, newX, newY);
       };
 
       const handleMouseUp = () => {
-        setActiveNoteId(null);
+        if (deletingIdRef.current) {
+          deleteNote(deletingIdRef.current);
+        }
+        resetStates();
         document.removeEventListener("mousemove", handleMouseMove);
         document.removeEventListener("mouseup", handleMouseUp);
       };
@@ -108,7 +175,7 @@ function App() {
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [handleDrag, setActiveNote],
+    [deleteNote, handleDrag, resetStates, setActiveNote],
   );
 
   return (
@@ -126,7 +193,7 @@ function App() {
             onUpdate={updateNote}
           />
         ))}
-        <TrashZone isActive={false} />
+        <TrashZone ref={trashZoneRef} isActive={!!overTrashId} />
       </div>
     </div>
   );
