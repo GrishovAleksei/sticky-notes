@@ -1,5 +1,5 @@
 import "./Header.css";
-import { hederHeight } from "../../vars.ts";
+import { hederHeight } from "../../utils/vars.ts";
 
 interface IProps {
   onClick(): void;

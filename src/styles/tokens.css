@@ -1,0 +1,8 @@
+:root {
+  --trash-red: #ef4444;
+  --trash-red-strong: #f30909;
+
+  --trash-bg: #EF444419;
+  --trash-bg-hover: rgba(239, 68, 68, 0.15);
+  --trash-bg-active: rgba(239, 68, 68, 0.30);
+}

@@ -6,7 +6,7 @@
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: linear-gradient(135deg, gray 0%, white 100%);
+  background: linear-gradient(135deg, #878080 0%, #83a7dc 100%);
   position: relative;
 }
 
@@ -19,11 +19,12 @@
 
 .canvas-adding {
   cursor: crosshair;
-  border: red 1px solid;
+  opacity: 0.9;
 }
 
-.canvas-dragging {
-  border: blue 1px solid;
+.canvas-dragging, .canvas-over-trash {
+  opacity: 0.8;
+  cursor: move;
 }
 
 @media (min-width: 1024px) and (min-height: 768px) {

@@ -2,11 +2,13 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Header } from "./components/Header/Header.tsx";
 import { type INote, ModeType } from "./types.ts";
 import { Note } from "./components/Note/Note.tsx";
-import { hederHeight, noteSize } from "./vars.ts";
+import { hederHeight, holdToRelease, noteSize } from "./utils/vars.ts";
 import { TrashZone } from "./components/TrashZone/TrashZone.tsx";
 import "./App.css";
+import "./styles/tokens.css";
 import { loadNotes, saveNotes } from "./Services/LocalStorage.ts";
 import { mockApi } from "./Services/api.ts";
+import { clamp } from "./utils";
 
 const MODE_CLASS: Record<ModeType, string> = {
   [ModeType.IDLE]: "idle",
@@ -23,25 +25,54 @@ function App() {
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   // TODO: duplicating! overTrashId & deletingIdRef
   const [overTrashId, setOverTrashId] = useState<string | null>(null);
+  const trashEnterTimerRef = useRef<number | null>(null);
+  const trashArmedRef = useRef(false);
+  const [isTrashArmed, setIsTrashArmed] = useState(false);
+
   const deletingIdRef = useRef<string | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
   const trashZoneRef = useRef<HTMLDivElement>(null);
+
+  const setArmed = (v: boolean) => {
+    trashArmedRef.current = v;
+    setIsTrashArmed(v);
+  };
+
+  const clearTrashTimer = useCallback(() => {
+    // console.log("[clearTrashTimer]: stop");
+    if (trashEnterTimerRef.current) {
+      window.clearTimeout(trashEnterTimerRef.current);
+      trashEnterTimerRef.current = null;
+    }
+    setArmed(false);
+  }, []);
+
+  const startTrashTimer = useCallback((id: string) => {
+    // console.log("[clearTrashTimer]: start");
+    if (trashEnterTimerRef.current) return;
+    // console.log("[clearTrashTimer]: start FIRST");
+    trashEnterTimerRef.current = window.setTimeout(() => {
+      trashEnterTimerRef.current = null;
+      if (deletingIdRef.current === id) {
+        setArmed(true);
+        setMode(ModeType.OVER_TRASH);
+      }
+    }, holdToRelease);
+  }, []);
 
   // Load
   useEffect(() => {
-    console.log("useEffect1");
     const savedNotes = loadNotes();
     if (savedNotes.length > 0) {
       setNotes(savedNotes);
-      const maxZ = Math.max(...savedNotes.map((note) => note.z), 0);
+      const maxZ = Math.max(...savedNotes.map((note) => note.z), 1);
       setMaxZIndex(maxZ + 1);
     }
   }, []);
 
   // Save
   useEffect(() => {
-    console.log("useEffect2");
-    // TODO: spam
-
+    // Todo: delay?
     if (notes.length > 0) {
       saveNotes(notes);
       mockApi.saveNotes(notes).catch((err) => {
@@ -55,11 +86,12 @@ function App() {
   }, []);
 
   const resetStates = useCallback(() => {
+    clearTrashTimer();
     setActiveNoteId(null);
     setOverTrashId(null);
     deletingIdRef.current = null;
     setMode(ModeType.IDLE);
-  }, []);
+  }, [clearTrashTimer]);
 
   const deleteNote = useCallback(
     (id: string) => {
@@ -139,12 +171,18 @@ function App() {
         );
 
         const _id = isOverlapping ? id : null;
-        console.log(`isOverlapping=${isOverlapping}`, id);
+        if (isOverlapping) {
+          // first time
+          if (!deletingIdRef.current) startTrashTimer(id);
+        } else {
+          // moved away
+          if (deletingIdRef.current) clearTrashTimer();
+        }
         deletingIdRef.current = _id;
         setOverTrashId(_id);
       }
     },
-    [notes, updateNote],
+    [clearTrashTimer, notes, startTrashTimer, updateNote],
   );
 
   const onClickNote = useCallback(
@@ -152,22 +190,26 @@ function App() {
       e.preventDefault();
       setActiveNote(id);
       const element = e.currentTarget as HTMLElement;
-      const rect = element.getBoundingClientRect();
-      const offsetX = e.clientX - rect.left;
-      const offsetY = e.clientY - rect.top + hederHeight;
+      const noteRect = element.getBoundingClientRect();
+      const canvas = canvasRef.current?.getBoundingClientRect();
+      const maxX = (canvas?.width ?? 0) - noteRect.width;
+      const maxY = (canvas?.height ?? 0) - noteRect.height - hederHeight;
+      const offsetX = e.clientX - noteRect.left;
+      const offsetY = e.clientY - noteRect.top + hederHeight;
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         setMode(ModeType.DRAGGING);
         const newX = moveEvent.clientX - offsetX;
         const newY = moveEvent.clientY - offsetY;
-        handleDrag(id, newX, newY);
+        handleDrag(id, clamp(newX, 0, maxX), clamp(newY, 0, maxY));
       };
 
       const handleMouseUp = () => {
-        if (deletingIdRef.current) {
+        if (deletingIdRef.current && trashArmedRef.current) {
           deleteNote(deletingIdRef.current);
         }
         resetStates();
+        saveNotes(notes);
         document.removeEventListener("mousemove", handleMouseMove);
         document.removeEventListener("mouseup", handleMouseUp);
       };
@@ -175,13 +217,14 @@ function App() {
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
     },
-    [deleteNote, handleDrag, resetStates, setActiveNote],
+    [deleteNote, handleDrag, notes, resetStates, setActiveNote],
   );
 
   return (
     <div className={"app"}>
       <Header onClick={activateAddingMode} />
       <div
+        ref={canvasRef}
         className={`canvas canvas-${MODE_CLASS[mode]}`}
         onClick={onClickCanvas}
       >
@@ -193,7 +236,11 @@ function App() {
             onUpdate={updateNote}
           />
         ))}
-        <TrashZone ref={trashZoneRef} isActive={!!overTrashId} />
+        <TrashZone
+          ref={trashZoneRef}
+          isActive={!!overTrashId}
+          isArmed={isTrashArmed}
+        />
       </div>
     </div>
   );

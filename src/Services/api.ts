@@ -8,7 +8,7 @@ export const mockApi = {
     notes: INote[],
   ): Promise<{ success: boolean; message: string }> {
     await delay(Math.random() * 500);
-    console.log("[Mock API]: Saved", notes);
+    // console.log("[Mock API]: Saved", notes);
     return {
       success: true,
       message: "Notes saved successfully",
@@ -17,7 +17,7 @@ export const mockApi = {
 
   async loadNotes(): Promise<INote[]> {
     await delay(Math.random() * 500);
-    console.log("[Mock API]: Loaded");
+    // console.log("[Mock API]: Loaded");
     return [];
   },
 };
