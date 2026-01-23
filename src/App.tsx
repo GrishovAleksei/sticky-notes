@@ -17,13 +17,13 @@ const MODE_CLASS: Record<ModeType, string> = {
   [ModeType.OVER_TRASH]: "over-trash",
 };
 
-// TODO: rm hederHeight from the dragging logic
+// TODO: 1) rm hederHeight from the dragging logic
+// TODO: 2) text selecting while resizing
 function App() {
   const [notes, setNotes] = useState<INote[]>([]);
   const [mode, setMode] = useState<ModeType>(ModeType.IDLE);
   const [maxZIndex, setMaxZIndex] = useState<number>(1);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
-  // TODO: duplicating! overTrashId & deletingIdRef
   const [overTrashId, setOverTrashId] = useState<string | null>(null);
   const trashEnterTimerRef = useRef<number | null>(null);
   const trashArmedRef = useRef(false);

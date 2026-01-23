@@ -23,6 +23,27 @@ export const Note = (props: IProps) => {
     }
   }, [isEditing]);
 
+  const startResize = (e: React.MouseEvent) => {
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startW = note.w;
+    const startH = note.h;
+
+    const onMove = (ev: MouseEvent) => {
+      const newW = Math.max(80, startW + (ev.clientX - startX));
+      const newH = Math.max(80, startH + (ev.clientY - startY));
+      onUpdate({ ...note, w: newW, h: newH });
+    };
+
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
+
   const onChangeText = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     onUpdate({ ...note, text: e.target.value });
   };
@@ -64,6 +85,13 @@ export const Note = (props: IProps) => {
             {note.text || "Click to edit..."}
           </div>
         )}
+        <div
+          className="resize"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            startResize(e);
+          }}
+        />
       </div>
     </div>
   );

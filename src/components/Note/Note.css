@@ -52,3 +52,18 @@
   color: #9ca3af;
   font-style: italic;
 }
+
+.resize {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 50%, #c3c3c3 50%);
+  opacity: 0.2;
+}
+
+.resize:hover {
+  opacity: 1;
+}
